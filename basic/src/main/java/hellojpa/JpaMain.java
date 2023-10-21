@@ -1,9 +1,8 @@
 package hellojpa;
 
-import javax.persistence.EntityManager;
-import javax.persistence.EntityManagerFactory;
-import javax.persistence.EntityTransaction;
-import javax.persistence.Persistence;
+import javax.persistence.*;
+
+import java.util.Arrays;
 import java.util.List;
 
 public class JpaMain {
@@ -20,11 +19,68 @@ public class JpaMain {
         tx.begin();
         try {
 
+            Team team = new Team();
+            team.setName("TeamA");
+
+            Team team2 = new Team();
+            team2.setName("TeamB");
+
+            Team team3 = new Team();
+            team3.setName("TeamC");
+
+            em.persist(team);   // pk값이 세팅되고 영속상태가 됨
+            em.persist(team2);
+            em.persist(team3);
+
+
             Member member = new Member();
-            member.setUSERNAME("C");
-            member.setRoleType(RoleType.ADMIN);
+            member.setUsername("member1");
+            member.changeTeam(team);
+//            member.setCreatedBy("kim");
+
+            Member member2 = new Member();
+            member2.setUsername("member2");
+            member2.changeTeam(team2);
+
+            Member member3 = new Member();
+            member3.setUsername("member3");
+            member3.changeTeam(team3);
 
             em.persist(member);
+            em.persist(member2);
+            em.persist(member3);
+
+            em.flush();
+            em.clear();
+
+            Team findTeam = em.find(Team.class, team.getId());  // 1차 캐시
+            System.out.println("findTeam = " + findTeam.getMembers());
+
+            em.flush();
+            em.clear();
+
+            System.out.println("===========================================");
+
+//            List<Member> resultList = em.createQuery("select m.id, m.team from Member as m", Member.class).getResultList();
+            List<Member> resultList = em.createQuery("select m from Member as m", Member.class).getResultList();
+            // 우선 select쿼리 그대로 실행 -> Member를 보니까 Team이 EAGER로 되어 있네? Team도 가져와야 하네?? -> Team Select문 실행
+
+
+            Team team1 = resultList.get(0).getTeam();
+            System.out.println("team1 = " + team1);
+            System.out.println("name = " + team1.getName());
+
+//            for (Member m : resultList) {
+//                System.out.println("m.getTeam() = " + m.getTeam().getName());
+//            }
+
+//            List<Member> findMembers = findTeam.getMembers();
+//
+//            for (Member m : findMembers) {
+//                System.out.println("m = " + m.getUsername());
+//            }
+
+
             tx.commit();
         } catch(Exception e) {
             tx.rollback();

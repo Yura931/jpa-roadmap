@@ -1,44 +1,85 @@
 package hellojpa;
 
 import javax.persistence.*;
-import java.math.BigDecimal;
 import java.time.LocalDate;
-import java.util.Date;
+import java.time.LocalDateTime;
+import java.util.ArrayList;
+import java.util.List;
 
-// jpa를 사용하는 애구나?! 인식
 @Entity
-@Table(name="MEMBER")
 public class Member {
-    // JPA에게 PK가 무엇인지 알려주어야 함
-    @Id
-    @GeneratedValue(strategy = GenerationType.IDENTITY)
+
+    @Id @GeneratedValue
+    @Column(name = "MEMBER_ID")
     private Long id;
-    @Column(name = "name", nullable = false) // unique제약조건을 컬럼레벨에서 주면 이름이 랜덤성으로 만들어짐
-    private String USERNAME;
-    private Integer age;
-    @Enumerated(EnumType.STRING) // Enum 사용시 EnumType은 항상 String으로 사용, 기본값인 ORDINAL 사용 시 ENUM 클래스에 값을 추가했을 때 버그 발생
-    private RoleType roleType;
-    @Temporal(TemporalType.TIMESTAMP)
-    private Date createDate;
-    @Temporal(TemporalType.TIMESTAMP)
-    private Date lastModifiedDate;
-    @Lob    // @Lob에 String타입이면 기본 clob으로 매핑 됨
-    private String description;
 
-    @Transient
-    private int temp;
-    public Member() {
+    @Column(name = "USERNAME")
+    private String username;
 
+//    @Column(name = "TEAM_ID")
+//    private Long teamId;
+
+    @ManyToOne(fetch = FetchType.EAGER)
+    @JoinColumn(name = "TEAM_ID")   // 조인하는 컬럼은 뭐야?
+    private Team team;  // 멤버 입장에서 하나의 팀에 여러 회원
+
+    @OneToOne
+    @JoinColumn(name = "LOCKER_ID")
+    private Locker locker;
+
+    @OneToMany(mappedBy = "member")
+    private List<MemberProduct> memberProducts = new ArrayList<>();
+
+
+    @Embedded
+    private Period workPeriod;
+
+    @Embedded
+    private Address homeAddress;
+
+    @Embedded
+    @AttributeOverrides({ // 같은 객체를 Embedded 했을 때 AttributeOverrides를 사용해서 컬럼 명 속성을 재정의 해주면 됨
+            @AttributeOverride(name = "city", column = @Column(name = "WORK_CITY")),
+            @AttributeOverride(name = "street", column = @Column(name = "WORK_STREET")),
+            @AttributeOverride(name = "zipcode", column = @Column(name = "WORK_ZIPCODE")),
+    })
+    private Address workAddress;
+
+    public Address getWorkAddress() {
+        return workAddress;
     }
 
-    public Member(Long id, String USERNAME, Integer age, RoleType roleType, Date createDate, Date lastModifiedDate, String description) {
-        this.id = id;
-        this.USERNAME = USERNAME;
-        this.age = age;
-        this.roleType = roleType;
-        this.createDate = createDate;
-        this.lastModifiedDate = lastModifiedDate;
-        this.description = description;
+    public void setWorkAddress(Address workAddress) {
+        this.workAddress = workAddress;
+    }
+
+    public Period getWorkPeriod() {
+        return workPeriod;
+    }
+
+    public void setWorkPeriod(Period workPeriod) {
+        this.workPeriod = workPeriod;
+    }
+
+    public Address getHomeAddress() {
+        return homeAddress;
+    }
+
+    public void setHomeAddress(Address homeAddress) {
+        this.homeAddress = homeAddress;
+    }
+
+    public Team getTeam() {
+        return team;
+    }
+
+    public void changeTeam(Team team) {
+        this.team = team;
+        team.getMembers().add(this);
+    }
+
+    public Member() {
+
     }
 
     public Long getId() {
@@ -49,51 +90,11 @@ public class Member {
         this.id = id;
     }
 
-    public String getUSERNAME() {
-        return USERNAME;
+    public String getUsername() {
+        return username;
     }
 
-    public void setUSERNAME(String USERNAME) {
-        this.USERNAME = USERNAME;
-    }
-
-    public Integer getAge() {
-        return age;
-    }
-
-    public void setAge(Integer age) {
-        this.age = age;
-    }
-
-    public RoleType getRoleType() {
-        return roleType;
-    }
-
-    public void setRoleType(RoleType roleType) {
-        this.roleType = roleType;
-    }
-
-    public Date getCreateDate() {
-        return createDate;
-    }
-
-    public void setCreateDate(Date createDate) {
-        this.createDate = createDate;
-    }
-
-    public Date getLastModifiedDate() {
-        return lastModifiedDate;
-    }
-
-    public void setLastModifiedDate(Date lastModifiedDate) {
-        this.lastModifiedDate = lastModifiedDate;
-    }
-
-    public String getDescription() {
-        return description;
-    }
-
-    public void setDescription(String description) {
-        this.description = description;
+    public void setUsername(String username) {
+        this.username = username;
     }
 }
