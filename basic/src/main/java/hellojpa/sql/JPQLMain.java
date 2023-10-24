@@ -21,6 +21,7 @@ public class JPQLMain {
                     "select m from Member as m where m.username like '%kim%'",
                     Member.class
             ).getResultList();
+
             tx.commit();
         } catch (Exception e) {
             tx.rollback();
