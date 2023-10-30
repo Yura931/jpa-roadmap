@@ -4,6 +4,7 @@ import lombok.AccessLevel;
 import lombok.Getter;
 import lombok.NoArgsConstructor;
 import lombok.Setter;
+import org.hibernate.annotations.BatchSize;
 
 import javax.persistence.*;
 import java.time.LocalDateTime;
@@ -22,8 +23,9 @@ public class Order {
 
     @ManyToOne(fetch = FetchType.LAZY)
     @JoinColumn(name = "member_id")
-    private Member member;
+    private Member member; // fetchtype lazy 설정 시 bytebuddy proxy가 대신 들어가있게 되는 것, json라이브러리가 proxy객체를 어떻게 할 수 없음
 
+//    @BatchSize(size = 1000) 개별 최적화, yml파일에 글로벌 적용만 해도 좋음
     @OneToMany(mappedBy = "order", cascade = CascadeType.ALL)
     private List<OrderItem> orderItems = new ArrayList<>();
 

@@ -8,15 +8,17 @@ spring:
 
   jpa:
     hibernate:
-      ddl-auto: update
+      ddl-auto: create
 
     properties:
       hibernate:
 #       show_sql: true sysout 출력 시 사용
         format_sql: true
+        default_batch_fetch_size: 100 # N + 1 문제에서 어느정도 해방, 컬렉션이나, 프록시 객체를 설정한 사이즈만큼 한 번에 in 쿼리로 조회
     database-platform: org.hibernate.dialect.H2Dialect
+#    open-in-view: false
 
 logging:
   level:
     org.hibernate.SQL: debug  # 로그 출력 시 사용
-    org.hibernate.type: trace # 파라미터 로그 출력
+#    org.hibernate.type: trace # 파라미터 로그 출력
