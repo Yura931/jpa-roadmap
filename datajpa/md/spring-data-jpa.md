@@ -223,8 +223,6 @@ public class Team extends JpaBaseEntity {
   - @LastModifiedBy
 - 등록자, 수정자를 처리해주는 `AuditorAware` 스프링 빈 등록
 ```text
-
-
 @EnableJpaAuditing  -> 스프링 부트 설정 클래스에 적용해야 함
 @SpringBootApplication
 public class DatajpaApplication {
@@ -253,5 +251,101 @@ public class BaseEntity extends BaseTimeEntity{
 
     @LastModifiedBy
     private String lastModifiedBy;
+}
+```
+
+### 스프링 데이터 JPA 구현체
+- SimpleJpaRepository
+```text
+// 빈 등록 뿐 아니라 스프링에서 쓸 수 있는 예외로 다 변경 해 줌, 하부 기술을 JDBC에서 JPA로 바꿔도 exception 처리하는 매커니즘이 동일, 서비스나 컨트롤러나 ..
+// 하부 구현 기술을 바꿔도 기존 비즈니스 로직에 영향을 주지 않도록 설계 되어 있음
+@Repository  
+@Transactional(readOnly = true) -> 서비스 계층에 transaction을 받아서 실행되기도 하고 없으면 개별적으로 실행 됨
+public class SimpleJpaRepository<T, ID> implements JpaRepositoryImplementation<T, ID> {
+
+}
+```
+- 내부적으로 jpa 사용해서 구현 되어 있음
+- 내부(리파지토리 계층에!)에 데이터 변경하는 메서드에 Transactional이 걸려 있음 
+  - 스프링 데이터 JPA는 변경(등록, 수정, 삭제)메서드를 트랜잭션 처리
+  - 서비스 계층에서 트랜잭션을 시작하지 않으면 리파지토리에서 트랜잭션 시작
+  - 서비스 계층에서 트랜잭션을 시작하면 리파지토리는 해당 트랜잭션을 전파 받아서 사용
+- `@Transactional(readOnly = true)`
+  - 데이터를 단순히 조회만 하고 변경하지 않는 트랜잭션에서 `readOnly = true` 옵션을 사용하면 플러시를 생략해서 약간의 성능 향상을 얻을 수 있음
+  - 기본적으로 트랜잭션이 끝날 때 JPA 영속성 컨텍스트에 있는 정보들을 DB에 플러시를 함
+- **매우 중요!!!**
+  - `save()`메서드
+    - 새로운 엔티티면 저장(`persist`)
+    - 새로운 엔티티가 아니면 병합(`merge`): 단점 - 디비에 셀렉트 쿼리가 한 번 나간다. 가급적 쓰면 안된다. 데이터 변경은 변경감지를 통해서!
+  - 새로운 엔티티를 판단하는 기본 전략
+    - 식별자가 객체일 때 `null`로 판단
+    - 식별자가 자바 기본 타입일 때 `0`으로 판단
+    - `Persistable` 인터페이스를 구현해서 판단 로직 변경 가능
+      - JPA 식별자 생성 전략이`@GenerateValue`면 `save()` 호출 시점에 식별자가 없으므로 새로운 엔티티로 인식해서 정상 동작
+      - JPA 식별자 생성 전략이 `@Id`만 사용한 직접 할당이면 이미 식별자 값이 있는 상태로 `save()`를 호출해서 `merge()`가 호출된다.
+      - `merge()`는 비효율적, `Persistable`을 사용해 새로운 엔티티 확인 여부를 직접 구현하는 것이 효과적이다.
+      - 등록시간(`@CreatedDate`)을 조합해서 사용하면 이 필드로 새로운 엔티티 여부를 편리하게 확인할 수 있다.
+```java
+@Entity
+@EntityListeners(AuditingEntityListener.class)
+@Getter
+@NoArgsConstructor(access = AccessLevel.PROTECTED)
+public class Item implements Persistable<String> {
+
+    @Id
+    private String id;
+
+    @CreatedDate
+    private LocalDateTime createDate;
+
+    public Item(String id) {
+        this.id = id;
+    }
+
+    @Override
+    public boolean isNew() {    // isNew() 직접 구현
+        return createDate == null;
+    }
+}
+```
+
+### Specifications(명세)
+- 스프링 데이터 JPA는 JPA Criteria를 활용해서 이 개념을 사용할 수 있도록 지원
+- 미래엔 어떻게 될 지 잘 모르겠지만.. JPA Criteria는 좀.. 
+- **실무에서는 JPA Criteria 대신 QueryDSL 사용하자**
+
+### QueryByExample
+- 도메인 객체를 조건으로 사용
+- 데이터 저장소를 RDB에서 NOSQL로 변경해도 코드 변경이 없게 추상화 되어 있음
+- 단점
+  - 조인은 가능하지만 내부 조인(INNER JOIN)만 가능, 외부 조인(LEFT JOIN) 안 됨
+  - 중첩 제약조건 안 됨
+    - `firstname = ?0 or (firstname = ?1 and lastname = ?2)`
+- 아우터 조인이 하나라도 들어가게 되면 다 버리고 다시 짜야 됨
+
+### Projections - query의 select절에 들어 갈 데이터
+- 엔티티 대신에 DTO를 편리하게 조회할 때 사용
+- 전체 엔티티가 아니라 만약 회원 이름만 딱 조회하고 싶으면??
+- 프로젝션 대상이 root 엔티티면, JPQL SELECT 절 최적화 가능
+- 프로젝션 대상이 ROOT가 아니면
+  - LEFT OUTER JOIN 처리
+  - 모든 필드를 SELECT해서 엔티티로 조회한 다음에 계산
+- 프로젝션 대상이 root 엔티티면 유용하다.
+- 프로젝션 대상이 root 엔티티를 넘어가면 JPQL SELECT 최적화가 안된다.
+- 실무에서는 단순할 때만 사용하고, 조금만 복잡해지면 QueryDSL을 사용하자.
+
+### 네이티브 쿼리
+- JDBC를 직접 쓰거나, JDBC 템플릿, MyBatis를 가지고 SQL을 직접 짜는 것들을 말함
+- JPA가 네이티브 쿼리를 지원 함
+- 가급적 사용하지 않는 것이 좋음, 어쩔 수 없을 때 사용
+- 엔티티 전체를 조회하기 보다 DTO에 맞춰 가져오고 싶을 때 사용하는데 반환타입 지원이 많이 안 되서 한계가 있음
+- **네이티브 SQL을 DTO로 조회할 때는 JdbcTemplate or MyBatis 권장**
+- DTO를 뽑는데 좀 편하게 뽑을 수 있는 것, 네이티브 쿼리이면서 동적 쿼리 뽑을 수 있는 방법은 있음
+```java
+// projection 인터페이스 사용
+public interface MemberProjection {
+    Long getId();
+    String getUsername();
+    String getTeamName();
 }
 ```
